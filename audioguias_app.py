@@ -37,6 +37,7 @@ from text_parser import parse_text_file
 import translator as mod_translator
 import tts_generator as mod_tts
 import audio_mixer as mod_mixer
+import js_generator as mod_js
 
 
 # =====================================================================
@@ -64,8 +65,12 @@ class AudioguiasApp(ctk.CTk):
         self.step_translate = ctk.BooleanVar(value=True)
         self.step_tts = ctk.BooleanVar(value=True)
         self.step_mix = ctk.BooleanVar(value=True)
+        self.step_generate_js = ctk.BooleanVar(value=True)
         self.skip_existing = ctk.BooleanVar(value=True)
         self.keep_intermediates = ctk.BooleanVar(value=False)
+
+        self.js_output_path = ctk.StringVar(value="")  # vacío = <work_dir>/audioDatabase.js
+        self.js_base_url_prefix = ctk.StringVar(value="BASE_URL + ")
 
         self.music_volume_db = ctk.StringVar(value="-9")
         self.fade_seconds = ctk.StringVar(value="5")
@@ -95,6 +100,7 @@ class AudioguiasApp(ctk.CTk):
         self._build_files_section(left)
         self._build_steps_section(left)
         self._build_mix_section(left)
+        self._build_js_section(left)
         self._build_languages_section(left)
         self._build_execute_section(left)
 
@@ -155,6 +161,9 @@ class AudioguiasApp(ctk.CTk):
             .grid(row=1, column=1, sticky="w", padx=8, pady=4)
         ctk.CTkCheckBox(box, text="3. Mezclar con música", variable=self.step_mix)\
             .grid(row=1, column=2, sticky="w", padx=8, pady=4)
+        ctk.CTkCheckBox(box, text="4. Generar audioDatabase.js",
+                        variable=self.step_generate_js)\
+            .grid(row=1, column=3, sticky="w", padx=8, pady=4)
 
         ctk.CTkCheckBox(box, text="Omitir archivos ya existentes (más rápido)",
                         variable=self.skip_existing)\
@@ -180,6 +189,35 @@ class AudioguiasApp(ctk.CTk):
         ctk.CTkLabel(box, text="Fade-out (segundos):").grid(row=1, column=2, sticky="w", padx=8, pady=4)
         ctk.CTkEntry(box, textvariable=self.fade_seconds, width=80)\
             .grid(row=1, column=3, sticky="w", padx=4, pady=(0, 8))
+
+    def _build_js_section(self, parent):
+        box = ctk.CTkFrame(parent)
+        box.pack(fill="x", padx=4, pady=(4, 8))
+        box.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(box, text="audioDatabase.js (paso 4)",
+                     font=ctk.CTkFont(size=13, weight="bold"))\
+            .grid(row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(6, 2))
+
+        ctk.CTkLabel(box, text="Archivo .js:").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        ctk.CTkEntry(box, textvariable=self.js_output_path,
+                     placeholder_text="(vacío → <work_dir>/audioDatabase.js)")\
+            .grid(row=1, column=1, sticky="ew", padx=4)
+        ctk.CTkButton(box, text="Examinar", width=90,
+                      command=self._pick_js_output).grid(row=1, column=2, padx=8, pady=4)
+
+        ctk.CTkLabel(box, text="Prefijo URL:").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        ctk.CTkEntry(box, textvariable=self.js_base_url_prefix)\
+            .grid(row=2, column=1, columnspan=2, sticky="ew", padx=4, pady=(0, 4))
+
+        ctk.CTkLabel(
+            box,
+            text=("'BASE_URL + ' deja la variable JS sin tocar (recomendado).\n"
+                  "Reemplázalo por '\"https://miservidor.com/\" + ' si quieres URLs absolutas."),
+            justify="left",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        ).grid(row=3, column=0, columnspan=3, sticky="w", padx=8, pady=(0, 6))
 
     def _build_languages_section(self, parent):
         box = ctk.CTkFrame(parent)
@@ -245,6 +283,16 @@ class AudioguiasApp(ctk.CTk):
         if path:
             var.set(path)
 
+    def _pick_js_output(self):
+        path = filedialog.asksaveasfilename(
+            title="Guardar audioDatabase.js como...",
+            defaultextension=".js",
+            initialfile="audioDatabase.js",
+            filetypes=[("JavaScript", "*.js"), ("Todos", "*.*")],
+        )
+        if path:
+            self.js_output_path.set(path)
+
     def _select_all_langs(self):
         for var, _ in self.lang_vars:
             var.set(True)
@@ -287,19 +335,20 @@ class AudioguiasApp(ctk.CTk):
             messagebox.showerror("Sin idiomas", "Selecciona al menos un idioma.")
             return
 
-        if not (self.step_translate.get() or self.step_tts.get() or self.step_mix.get()):
+        if not (self.step_translate.get() or self.step_tts.get()
+                or self.step_mix.get() or self.step_generate_js.get()):
             messagebox.showerror("Sin pasos", "Selecciona al menos un paso a ejecutar.")
             return
 
         texto = self.texto_path.get().strip()
-        if self.step_translate.get() or self.step_mix.get() or self.step_tts.get():
-            if not texto or not os.path.exists(texto):
-                messagebox.showerror(
-                    "Falta texto.txt",
-                    "Selecciona un texto.txt válido (se usa para obtener los títulos "
-                    "y nombrar los archivos finales)."
-                )
-                return
+        # Cualquier paso necesita texto.txt (para títulos)
+        if not texto or not os.path.exists(texto):
+            messagebox.showerror(
+                "Falta texto.txt",
+                "Selecciona un texto.txt válido (se usa para obtener los títulos "
+                "y nombrar los archivos finales)."
+            )
+            return
 
         music = self.music_path.get().strip()
         if self.step_mix.get():
@@ -328,6 +377,9 @@ class AudioguiasApp(ctk.CTk):
             do_translate=self.step_translate.get(),
             do_tts=self.step_tts.get(),
             do_mix=self.step_mix.get(),
+            do_generate_js=self.step_generate_js.get(),
+            js_output_path=self.js_output_path.get().strip(),
+            js_base_url_prefix=self.js_base_url_prefix.get(),
             skip_existing=self.skip_existing.get(),
             cleanup_intermediates=not self.keep_intermediates.get(),
         )
@@ -340,7 +392,10 @@ class AudioguiasApp(ctk.CTk):
         try:
             self._log("=" * 60)
             self._log(f"Idiomas seleccionados: {len(p['idiomas'])}")
-            self._log(f"Pasos: traducir={p['do_translate']} tts={p['do_tts']} mezcla={p['do_mix']}")
+            self._log(
+                f"Pasos: traducir={p['do_translate']} tts={p['do_tts']} "
+                f"mezcla={p['do_mix']} js={p['do_generate_js']}"
+            )
             self._log(f"Carpeta de trabajo: {p['work_dir']}")
             self._log(f"Conservar intermedios: {not p['cleanup_intermediates']}")
             self._log("=" * 60)
@@ -393,6 +448,20 @@ class AudioguiasApp(ctk.CTk):
                     cleanup_intermediates=p["cleanup_intermediates"],
                 )
 
+            # 4. Generar audioDatabase.js
+            if p["do_generate_js"]:
+                self._log("\n--- PASO 4: Generación audioDatabase.js ---")
+                js_path = p["js_output_path"] or os.path.join(
+                    p["work_dir"], "audioDatabase.js"
+                )
+                mod_js.generate_database(
+                    secciones=secciones,
+                    idiomas_seleccionados=p["idiomas"],
+                    output_path=js_path,
+                    base_url_prefix=p["js_base_url_prefix"],
+                    progress_cb=self._log,
+                )
+
             self._log("\n" + "=" * 60)
             self._log("PROCESO COMPLETADO")
             self._log("=" * 60)
@@ -402,20 +471,6 @@ class AudioguiasApp(ctk.CTk):
         finally:
             self.after(0, lambda: self.run_button.configure(
                 state="normal", text="▶  EJECUTAR"))
-
-
-# =====================================================================
-# Entry point
-# =====================================================================
-def main():
-    app = AudioguiasApp()
-    app.mainloop()
-
-
-if __name__ == "__main__":
-    main()
-0, lambda: self.run_button.configure(
-                state="normal", text="▶  EJECUTAR")
 
 
 # =====================================================================

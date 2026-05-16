@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.python-version
+
+# --- Salida del pipeline ---
+# Carpetas con audios generados (pueden pesar cientos de MB)
+audios_finales/
+audios_editados/
+idiomas/
+
+# Archivos JS generados
+audioDatabase.js
+
+# Música de fondo y guiones (cada tour tiene los suyos)
+*.mp3
+*.wav
+*.m4a
+texto*.txt
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+desktop.ini
+__MACOSX/
+._*
+
+# --- Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Logs ---
+*.log
