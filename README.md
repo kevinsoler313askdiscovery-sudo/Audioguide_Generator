@@ -1,21 +1,26 @@
-# Audioguías · Pipeline multilenguaje
+# Audioguías · Pipeline multilenguaje v2.0
 
-Aplicación de escritorio con interfaz gráfica que automatiza la producción de audioguías turísticas en 42 idiomas a partir de un único guion en español.
+Aplicación web que automatiza la producción de audioguías turísticas en 42 idiomas a partir de un único guion en español. **100% Python, sin dependencias externas:** un solo `pip install -r requirements.txt` y listo.
 
-El pipeline consta de cuatro pasos encadenados:
+## Novedades v2.0
+
+- **Interfaz web** (HTML/CSS/JS) servida por Flask en vez de la antigua GUI de escritorio.
+- **Sin FFmpeg externo**: la mezcla de audio se hace con [Pedalboard](https://github.com/spotify/pedalboard) de Spotify (pure-Python con binarios embebidos en el wheel de pip).
+- **Lista para web**: se puede ejecutar localmente o desplegarse en cualquier servidor con Python.
+
+## Pipeline (4 pasos)
 
 1. **Traducción** del guion (`texto.txt`) a los idiomas seleccionados (Google Translate vía `deep-translator`).
 2. **Síntesis de voz** (TTS) con voces neuronales femeninas (Microsoft Edge TTS).
-3. **Mezcla con música de fondo** vía FFmpeg, con control de volumen, fade-out y limitador.
+3. **Mezcla con música de fondo** (Pedalboard + numpy): atenuación, fade-out y limitador.
 4. **Generación de `audioDatabase.js`** con URLs y títulos traducidos al idioma nativo, listo para integrar en la app web/móvil de la audioguía.
-
-Todo se controla desde una interfaz con CustomTkinter: eliges idiomas con checkboxes, marcas los pasos a ejecutar y pulsas un botón. Cero edición manual de archivos por idioma.
 
 ## Requisitos
 
 - **Python 3.10+**
-- **FFmpeg** en el PATH (o en `C:\ffmpeg-master-latest-win64-gpl-shared\bin\` por defecto en Windows). Descarga en [ffmpeg.org](https://ffmpeg.org/download.html).
 - **Conexión a internet** (Google Translate y Microsoft Edge TTS son servicios online).
+
+No necesitas FFmpeg ni ningún otro binario externo. Todo se instala con pip.
 
 ## Instalación
 
@@ -27,36 +32,29 @@ pip install -r requirements.txt
 
 ## Uso
 
-1. Prepara un archivo `texto.txt` con el guion en español, dividido en secciones numeradas con este formato:
+Lanza el servidor:
 
-   ```
-   1 – INTRODUCCIÓN · BIENVENIDA
-   Hola y bienvenidos al tour...
+```bash
+python audioguias_server.py
+```
 
-   2 – CAMINO HACIA AYUTTHAYA
-   El paisaje empieza a cambiar...
-   ```
+Se abrirá automáticamente el navegador en `http://127.0.0.1:8000`.
 
-2. Consigue un archivo `.mp3` con la música de fondo del tour.
+En la interfaz:
 
-3. Lanza la aplicación:
+1. Sube el guion `texto.txt` (formato `1 – TÍTULO`, una sección por bloque).
+2. Sube la música de fondo (.mp3, .wav, .m4a, .ogg o .flac).
+3. Marca los pasos a ejecutar (los 4 por defecto).
+4. Ajusta volumen de la música (dB) y fade-out si lo necesitas.
+5. Marca los idiomas (botón **Todos** para los 42).
+6. Pulsa **EJECUTAR**.
 
-   ```bash
-   python audioguias_app.py
-   ```
+Los logs se muestran en tiempo real en la columna derecha. Al terminar aparece un botón **Descargar resultado (.zip)** con todas las carpetas por idioma y el `audioDatabase.js`.
 
-4. En la interfaz:
-   - Selecciona `texto.txt` y la música de fondo.
-   - Elige la **carpeta de trabajo** (donde se guardarán los audios finales).
-   - Marca los pasos a ejecutar (los 4 por defecto).
-   - Marca los idiomas que quieres procesar (botón **Todos** para los 42).
-   - Ajusta volumen de la música (dB) y duración del fade-out si lo necesitas.
-   - Pulsa **EJECUTAR**.
-
-Al terminar, dentro de la carpeta de trabajo encontrarás:
+Estructura del .zip resultante:
 
 ```
-carpeta_de_trabajo/
+audioguias_<job_id>.zip
 ├── audioDatabase.js
 ├── english/
 │   ├── 1.introduccion_bienvenida_en.mp3
@@ -68,20 +66,43 @@ carpeta_de_trabajo/
 └── ...
 ```
 
-Cada subcarpeta lleva como nombre la clave en inglés del idioma (alineada con `translationsGB.js` y `audioDatabase.js` del proyecto de la audioguía).
+## Despliegue en servidor
+
+El servidor Flask se puede desplegar tal cual con un WSGI/ASGI como `gunicorn` o `waitress`:
+
+```bash
+# Linux
+pip install gunicorn
+gunicorn -w 1 --threads 4 -b 0.0.0.0:8000 audioguias_server:app
+
+# Windows
+pip install waitress
+waitress-serve --listen=0.0.0.0:8000 audioguias_server:app
+```
+
+Variables de entorno opcionales:
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `AUDIOGUIAS_HOST` | `127.0.0.1` | Interfaz donde escucha |
+| `AUDIOGUIAS_PORT` | `8000` | Puerto |
+| `AUDIOGUIAS_WORK_ROOT` | `./_workspace` | Carpeta donde se guardan los archivos por job |
 
 ## Estructura del proyecto
 
 | Archivo | Propósito |
-|---------|-----------|
-| `audioguias_app.py` | Aplicación principal con la GUI (CustomTkinter). Entry point. |
-| `languages.py` | Mapeo centralizado de los 42 idiomas: carpeta, etiqueta nativa, código Google, voz edge-tts, sufijo. |
-| `text_parser.py` | Lee `texto.txt` y extrae secciones numeradas con sus títulos normalizados a slug. |
-| `translator.py` | Paso 1: traduce el guion a cada idioma seleccionado. |
+|---|---|
+| `audioguias_server.py` | Servidor Flask · entry point. Endpoints REST + SSE para logs. |
+| `templates/index.html` | UI web (estructura). |
+| `static/style.css` | Estilos con gradiente corporativo `#F200C6 → #971EE8`. |
+| `static/app.js` | Lógica del frontend: upload, lanzamiento, streaming de logs, descarga. |
+| `languages.py` | Mapeo centralizado de los 42 idiomas alineado con `translationsGB.js`. |
+| `text_parser.py` | Lee `texto.txt` y extrae secciones numeradas con sus títulos. |
+| `translator.py` | Paso 1: traduce el guion a cada idioma. |
 | `tts_generator.py` | Paso 2: genera audios `.mp3` con voz neuronal. |
-| `audio_mixer.py` | Paso 3: mezcla voz + música con FFmpeg y limpia los intermedios. |
+| `audio_mixer.py` | Paso 3: mezcla voz + música con Pedalboard. |
 | `js_generator.py` | Paso 4: emite `audioDatabase.js` con URLs y títulos por idioma. |
-| `requirements.txt` | Dependencias de Python. |
+| `requirements.txt` | Dependencias de Python (5 paquetes). |
 
 ## Idiomas soportados (42)
 
@@ -89,10 +110,10 @@ English, Arabic (العربية), Basque (Euskara, *sin TTS*), Bengali (বা�
 
 > Euskera (Vasco) se traduce pero **no se genera audio TTS** porque Microsoft Edge no ofrece voz neuronal para ese idioma.
 
-## Opciones útiles
+## Opciones útiles en la UI
 
 - **Omitir archivos ya existentes**: si el proceso se interrumpe, vuelves a pulsar EJECUTAR y solo se genera lo que falta.
-- **Conservar archivos intermedios**: por defecto los `.txt` y `.mp3` sin música se borran tras la mezcla. Marca esta casilla si quieres conservarlos (útil para probar varias músicas sin regenerar TTS).
+- **Conservar archivos intermedios**: por defecto los `.txt` y `.mp3` sin música se borran tras la mezcla. Marca esta casilla si quieres conservarlos.
 - **Pasos independientes**: puedes ejecutar solo el paso 4 para regenerar el `audioDatabase.js` sin tocar los audios.
 
 ## Personalizar voces o sufijos
@@ -103,4 +124,4 @@ Edita `languages.py`. Cada entrada es una tupla con los 5 campos:
 ("folder_name", "Display Native", "lang_code", "voice-edge-tts", "suffix")
 ```
 
-Para añadir un idioma nuevo, agrégalo a la lista `LANGUAGES`. Para cambiar la voz de un idioma, sustituye el campo `voice` por otra voz neuronal de Microsoft Edge (lista completa: `edge-tts --list-voices`).
+Para añadir un idioma nuevo, agrégalo a `LANGUAGES`. Para cambiar la voz, sustituye el campo `voice` por otra voz neuronal de Microsoft Edge (lista completa: `edge-tts --list-voices`).

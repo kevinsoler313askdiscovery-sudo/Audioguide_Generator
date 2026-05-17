@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audioguías · Pipeline multilenguaje v2.0</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <div class="brand-mark"></div>
+                <div>
+                    <h1>Audioguías</h1>
+                    <span class="subtitle">Pipeline multilenguaje · v2.0</span>
+                </div>
+            </div>
+            <div class="version-pill">42 idiomas</div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- Columna izquierda: controles -->
+        <section class="panel controls">
+            <!-- 1. Archivos -->
+            <div class="card">
+                <h2>1 · Archivos</h2>
+                <div class="field">
+                    <label for="texto-file">Guion (texto.txt)</label>
+                    <input type="file" id="texto-file" accept=".txt" required>
+                    <small id="texto-info" class="hint">Formato esperado: secciones numeradas como <code>1 – TÍTULO</code></small>
+                </div>
+                <div class="field">
+                    <label for="music-file">Música de fondo (.mp3)</label>
+                    <input type="file" id="music-file" accept=".mp3,.wav,.m4a,.ogg,.flac">
+                    <small id="music-info" class="hint">Solo necesaria si activas el paso 3</small>
+                </div>
+            </div>
+
+            <!-- 2. Pasos -->
+            <div class="card">
+                <h2>2 · Pasos a ejecutar</h2>
+                <div class="step-grid">
+                    <label class="check"><input type="checkbox" id="step-translate" checked> <span>1. Traducir</span></label>
+                    <label class="check"><input type="checkbox" id="step-tts" checked> <span>2. Generar TTS</span></label>
+                    <label class="check"><input type="checkbox" id="step-mix" checked> <span>3. Mezclar música</span></label>
+                    <label class="check"><input type="checkbox" id="step-js" checked> <span>4. audioDatabase.js</span></label>
+                </div>
+                <label class="check inline"><input type="checkbox" id="skip-existing" checked> <span>Omitir archivos ya existentes</span></label>
+                <label class="check inline"><input type="checkbox" id="keep-intermediates"> <span>Conservar archivos intermedios (.txt y .mp3 sin música)</span></label>
+            </div>
+
+            <!-- 3. Configuración de mezcla -->
+            <div class="card">
+                <h2>3 · Configuración de mezcla</h2>
+                <div class="row">
+                    <div class="field">
+                        <label for="music-vol">Volumen música (dB)</label>
+                        <input type="number" id="music-vol" value="-9" step="0.5">
+                    </div>
+                    <div class="field">
+                        <label for="fade-sec">Fade-out (segundos)</label>
+                        <input type="number" id="fade-sec" value="5" min="0" step="0.5">
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="js-prefix">Prefijo URL en audioDatabase.js</label>
+                    <input type="text" id="js-prefix" value="BASE_URL + ">
+                    <small class="hint">'BASE_URL + ' deja la variable JS sin tocar (recomendado)</small>
+                </div>
+            </div>
+
+            <!-- 4. Idiomas -->
+            <div class="card">
+                <div class="card-header-row">
+                    <h2>4 · Idiomas</h2>
+                    <div class="lang-actions">
+                        <button type="button" class="btn-ghost" id="select-all">Todos</button>
+                        <button type="button" class="btn-ghost" id="select-none">Ninguno</button>
+                    </div>
+                </div>
+                <div id="languages-grid" class="languages-grid">
+                    <div class="loading">Cargando idiomas…</div>
+                </div>
+            </div>
+
+            <!-- Botón ejecutar -->
+            <button type="button" id="run-btn" class="btn-primary">
+                <span class="btn-label">▶ EJECUTAR</span>
+            </button>
+        </section>
+
+        <!-- Columna derecha: logs -->
+        <aside class="panel logs">
+            <div class="card logs-card">
+                <div class="card-header-row">
+                    <h2>Registro</h2>
+                    <span id="job-status" class="status-pill status-idle">Inactivo</span>
+                </div>
+                <div class="logs-toolbar">
+                    <button type="button" class="btn-ghost" id="clear-logs">Limpiar</button>
+                    <a id="download-link" class="btn-ghost" style="display:none" href="#">Descargar resultado (.zip)</a>
+                </div>
+                <pre id="log-output" class="log-output">Esperando ejecución…</pre>
+            </div>
+        </aside>
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
